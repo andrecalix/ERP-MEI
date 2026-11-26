@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Gestão MEI — Elétrica, Climatização & Comércio</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @media print {
+      .no-print { display: none !important; }
+      body { background: white !important; }
+      .print-area { box-shadow: none !important; border: none !important; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 font-sans min-h-screen">
+
+  <!-- Cabeçalho -->
+  <header class="bg-slate-900 text-white shadow-md no-print">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+      <div>
+        <h1 class="text-xl font-bold tracking-tight">ERP MEI • Gestão Própria</h1>
+        <p class="text-xs text-slate-300">CNPJ: 57.379.003/0001-03 • Ipatinga/MG • Elétrica, Ar-Condicionado & Materiais</p>
+      </div>
+      <div class="flex gap-2">
+        <button onclick="exportarBackup()" class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-2 rounded font-medium transition">Exportar Backup (JSON)</button>
+        <label class="bg-slate-700 hover:bg-slate-600 text-xs px-3 py-2 rounded font-medium cursor-pointer transition">
+          Importar Backup
+          <input type="file" accept=".json" onchange="importarBackup(event)" class="hidden" />
+        </label>
+      </div>
+    </div>
+
+    <!-- Navegação -->
+    <nav class="max-w-6xl mx-auto px-4 flex gap-1 overflow-x-auto border-t border-slate-800">
+      <button onclick="mudarAba('dashboard')" id="tab-dashboard" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-emerald-400 text-emerald-400">Painel & Limite MEI</button>
+      <button onclick="mudarAba('os')" id="tab-os" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white">Orçamentos & OS</button>
+      <button onclick="mudarAba('financeiro')" id="tab-financeiro" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white">Financeiro</button>
+      <button onclick="mudarAba('catalogo')" id="tab-catalogo" class="tab-btn px-4 py-3 text-sm font-medium border-b-2 border-transparent text-slate-300 hover:text-white">Catálogo & Clientes</button>
+    </nav>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6">
+
+    <!-- ABA 1: DASHBOARD -->
+    <section id="sec-dashboard" class="aba-sec space-y-6">
+      <!-- Cards Resumo -->
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold uppercase text-slate-400">Saldo em Caixa (Pago)</p>
+          <p id="card-saldo" class="text-2xl font-bold text-slate-900 mt-1">R$ 0,00</p>
+          <p class="text-xs text-slate-500 mt-1">Entradas pagas minus saídas pagas</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold uppercase text-emerald-600">Faturamento Serviços</p>
+          <p id="card-servicos" class="text-2xl font-bold text-emerald-700 mt-1">R$ 0,00</p>
+          <p class="text-xs text-slate-500 mt-1">Elétrica & Climatização (DASN-SIMEI)</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold uppercase text-blue-600">Faturamento Comércio</p>
+          <p id="card-comercio" class="text-2xl font-bold text-blue-700 mt-1">R$ 0,00</p>
+          <p class="text-xs text-slate-500 mt-1">Venda de materiais/peças (DASN-SIMEI)</p>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <p class="text-xs font-semibold uppercase text-amber-600">A Receber (Pendente)</p>
+          <p id="card-receber" class="text-2xl font-bold text-amber-600 mt-1">R$ 0,00</p>
+          <p class="text-xs text-slate-500 mt-1">Cobranças em aberto</p>
+        </div>
+      </div>
+
+      <!-- Barra Teto Anual MEI -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col sm:flex-row justify-between sm:items-center gap-2 mb-2">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">Acompanhamento do Teto Anual MEI (R$ 81.000,00)</h2>
+            <p class="text-xs text-slate-500">Soma automática de receitas brutas de Serviços + Comércio lançadas no sistema</p>
+          </div>
+          <span id="texto-teto" class="text-sm font-bold text-slate-700">R$ 0,00 / R$ 81.000,00 (0%)</span>
+        </div>
+        <div class="w-full bg-slate-200 rounded-full h-4 overflow-hidden">
+          <div id="barra-teto" class="bg-emerald-500 h-4 rounded-full transition-all duration-300" style="width: 0%"></div>
+        </div>
+      </div>
+
+      <!-- Resumo Despesas por Categoria -->
+      <div class="bg-white p-6 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-4">Resumo de Saídas / Custos Operacionais</h2>
+        <div id="resumo-despesas" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-sm"></div>
+      </div>
+    </section>
+
+    <!-- ABA 2: ORÇAMENTOS E ORDENS DE SERVIÇO -->
+    <section id="sec-os" class="aba-sec hidden space-y-6">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Formulário Nova OS -->
+        <div class="lg:col-span-1 bg-white p-5 rounded-xl shadow-sm border border-slate-200 no-print space-y-4">
+          <h2 class="text-base font-bold text-slate-800">Novo Orçamento / Ordem de Serviço</h2>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Cliente</label>
+            <input id="os-cliente" type="text" list="lista-clientes-dl" placeholder="Nome do cliente" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <datalist id="lista-clientes-dl"></datalist>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Telefone / WhatsApp</label>
+              <input id="os-telefone" type="text" placeholder="(31) 99999-9999" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+            <div>
+              <label class="block text-xs font-semibold text-slate-600 mb-1">Bairro / Local</label>
+              <input id="os-bairro" type="text" placeholder="Ex: Canaã / Ipaneminha" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Tipo Principal (Fiscal)</label>
+            <select id="os-categoria" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm">
+              <option value="Serviço">Prestação de Serviço (Elétrica / Ar-Condicionado)</option>
+              <option value="Comércio">Venda de Material / Comércio</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Descrição do Serviço / Equipamento</label>
+            <textarea id="os-descricao" rows="2" placeholder="Ex: Instalação Split 12.000 BTUs Inverter + suporte" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm"></textarea>
+          </div>
+
+          <!-- Adicionar Itens -->
+          <div class="border-t border-slate-200 pt-3">
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Adicionar Item / Peça / Mão de Obra</label>
+            <div class="flex gap-2 mb-2">
+              <input id="item-desc" type="text" list="lista-catalogo-dl" onchange="preencherPrecoCatalogo()" placeholder="Descrição" class="flex-1 border border-slate-300 rounded-lg px-2 py-1.5 text-sm" />
+              <datalist id="lista-catalogo-dl"></datalist>
+              <input id="item-valor" type="number" step="0.01" placeholder="R$" class="w-24 border border-slate-300 rounded-lg px-2 py-1.5 text-sm" />
+              <button type="button" onclick="adicionarItemOS()" class="bg-slate-800 text-white px-3 py-1.5 rounded-lg text-sm font-medium">+</button>
+            </div>
+            <ul id="os-itens-temp" class="text-xs space-y-1 text-slate-600"></ul>
+          </div>
+
+          <div>
+            <label class="block text-xs font-semibold text-slate-600 mb-1">Taxa de Deslocamento (R$)</label>
+            <input id="os-deslocamento" type="number" step="0.01" value="0" class="w-full border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          </div>
+
+          <button onclick="salvarOS()" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-2.5 rounded-lg text-sm transition">Salvar Orçamento / OS</button>
+        </div>
+
+        <!-- Lista de OS -->
+        <div class="lg:col-span-2 space-y-4">
+          <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+            <h2 class="text-base font-bold text-slate-800 mb-3">Ordens de Serviço & Orçamentos Emitidos</h2>
+            <div id="lista-os" class="space-y-3"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ABA 3: FINANCEIRO -->
+    <section id="sec-financeiro" class="aba-sec hidden space-y-6">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h2 class="text-base font-bold text-slate-800 mb-4">Novo Lançamento Financeiro</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3">
+          <select id="fin-tipo" onchange="atualizarCategoriasFin()" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="Entrada">Entrada (+)</option>
+            <option value="Saída">Saída (-)</option>
+          </select>
+          <select id="fin-categoria" class="border border-slate-300 rounded-lg px-3 py-2 text-sm"></select>
+          <input id="fin-desc" type="text" placeholder="Descrição (ex: Combustível / Manutenção)" class="lg:col-span-2 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input id="fin-valor" type="number" step="0.01" placeholder="Valor (R$)" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <select id="fin-status" class="border border-slate-300 rounded-lg px-3 py-2 text-sm">
+            <option value="Pago">Pago / Recebido</option>
+            <option value="Pendente">Pendente</option>
+          </select>
+        </div>
+        <div class="mt-3 flex justify-end">
+          <button onclick="adicionarLancamento()" class="bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2 rounded-lg text-sm font-semibold">Registrar Lançamento</button>
+        </div>
+      </div>
+
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 overflow-x-auto">
+        <h2 class="text-base font-bold text-slate-800 mb-3">Extrato de Movimentações</h2>
+        <table class="w-full text-left border-collapse text-sm">
+          <thead>
+            <tr class="border-b border-slate-200 text-slate-500 text-xs uppercase">
+              <th class="py-2">Data</th>
+              <th class="py-2">Tipo</th>
+              <th class="py-2">Categoria</th>
+              <th class="py-2">Descrição</th>
+              <th class="py-2">Valor</th>
+              <th class="py-2">Status</th>
+              <th class="py-2 text-right">Ações</th>
+            </tr>
+          </thead>
+          <tbody id="tabela-financeiro" class="divide-y divide-slate-100"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- ABA 4: CATÁLOGO E CLIENTES -->
+    <section id="sec-catalogo" class="aba-sec hidden grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <!-- Catálogo -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <h2 class="text-base font-bold text-slate-800">Catálogo de Serviços e Peças</h2>
+        <div class="flex gap-2">
+          <select id="cat-tipo" class="border border-slate-300 rounded-lg px-2 py-2 text-sm">
+            <option value="Serviço">Serviço</option>
+            <option value="Peça/Material">Peça/Material</option>
+          </select>
+          <input id="cat-nome" type="text" placeholder="Ex: Limpeza Split 9k-12k BTUs" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input id="cat-preco" type="number" step="0.01" placeholder="R$" class="w-24 border border-slate-300 rounded-lg px-2 py-2 text-sm" />
+          <button onclick="salvarCatalogo()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium">Salvar</button>
+        </div>
+        <ul id="lista-catalogo" class="divide-y divide-slate-100 text-sm"></ul>
+      </div>
+
+      <!-- Clientes -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 space-y-4">
+        <h2 class="text-base font-bold text-slate-800">Cadastro de Clientes</h2>
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-2">
+          <input id="cli-nome" type="text" placeholder="Nome" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <input id="cli-tel" type="text" placeholder="WhatsApp" class="border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+          <div class="flex gap-2">
+            <input id="cli-bairro" type="text" placeholder="Bairro" class="flex-1 border border-slate-300 rounded-lg px-3 py-2 text-sm" />
+            <button onclick="salvarCliente()" class="bg-slate-800 text-white px-4 py-2 rounded-lg text-sm font-medium">Salvar</button>
+          </div>
+        </div>
+        <ul id="lista-clientes" class="divide-y divide-slate-100 text-sm"></ul>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // Estado inicial com dados de exemplo do segmento
+    let db = JSON.parse(localStorage.getItem('erp_mei_db')) || {
+      financeiro: [],
+      ordens: [],
+      catalogo: [
+        { id: 1, tipo: 'Serviço', nome: 'Instalação Split 9.000 a 12.000 BTUs', preco: 450.00 },
+        { id: 2, tipo: 'Serviço', nome: 'Higienização / Limpeza Split', preco: 180.00 },
+        { id: 3, tipo: 'Serviço', nome: 'Carga de Gás R410A / R32', preco: 250.00 },
+        { id: 4, tipo: 'Serviço', nome: 'Manutenção Elétrica / Troca Disjuntor', preco: 120.00 },
+        { id: 5, tipo: 'Peça/Material', nome: 'Capacitor de Partida / Fase', preco: 65.00 }
+      ],
+      clientes: []
+    };
+
+    let itensOSTemp = [];
+
+    function salvarDB() {
+      localStorage.setItem('erp_mei_db', JSON.stringify(db));
+      renderizarTudo();
+    }
+
+    function formatarMoeda(v) {
+      return Number(v || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
+    }
+
+    function mudarAba(aba) {
+      document.querySelectorAll('.aba-sec').forEach(s => s.classList.add('hidden'));
+      document.getElementById('sec-' + aba).classList.remove('hidden');
+      document.querySelectorAll('.tab-btn').forEach(b => {
+        b.classList.remove('border-emerald-400', 'text-emerald-400');
+        b.classList.add('border-transparent', 'text-slate-300');
+      });
+      const btn = document.getElementById('tab-' + aba);
+      btn.classList.remove('border-transparent', 'text-slate-300');
+      btn.classList.add('border-emerald-400', 'text-emerald-400');
+    }
+
+    function atualizarCategoriasFin() {
+      const tipo = document.getElementById('fin-tipo').value;
+      const sel = document.getElementById('fin-categoria');
+      const opcoes = tipo === 'Entrada'
+        ? ['Serviço (Elétrica/Climatização)', 'Comércio (Venda de Materiais)']
+        : ['Peças e Insumos', 'Combustível / Deslocamento', 'Imposto DAS MEI', 'Ferramentas / Equipamentos', 'Outros'];
+      sel.innerHTML = opcoes.map(o => `<option value="${o}">${o}</option>`).join('');
+    }
+
+    function adicionarLancamento() {
+      const tipo = document.getElementById('fin-tipo').value;
+      const categoria = document.getElementById('fin-categoria').value;
+      const desc = document.getElementById('fin-desc').value.trim();
+      const valor = parseFloat(document.getElementById('fin-valor').value);
+      const status = document.getElementById('fin-status').value;
+
+      if (!desc || isNaN(valor) || valor <= 0) return alert('Preencha descrição e valor válido.');
+
+      db.financeiro.unshift({
+        id: Date.now(),
+        data: new Date().toLocaleDateString('pt-BR'),
+        tipo, categoria, desc, valor, status
+      });
+
+      document.getElementById('fin-desc').value = '';
+      document.getElementById('fin-valor').value = '';
+      salvarDB();
+    }
+
+    function alternarStatusFin(id) {
+      const item = db.financeiro.find(i => i.id === id);
+      if (item) item.status = item.status === 'Pago' ? 'Pendente' : 'Pago';
+      salvarDB();
+    }
+
+    function excluirFin(id) {
+      db.financeiro = db.financeiro.filter(i => i.id !== id);
+      salvarDB();
+    }
+
+    function preencherPrecoCatalogo() {
+      const nome = document.getElementById('item-desc').value;
+      const item = db.catalogo.find(c => c.nome === nome);
+      if (item) document.getElementById('item-valor').value = item.preco;
+    }
+
+    function adicionarItemOS() {
+      const desc = document.getElementById('item-desc').value.trim();
+      const valor = parseFloat(document.getElementById('item-valor').value);
+      if (!desc || isNaN(valor)) return;
+      itensOSTemp.push({ desc, valor });
+      document.getElementById('item-desc').value = '';
+      document.getElementById('item-valor').value = '';
+      renderizarItensTemp();
+    }
+
+    function renderizarItensTemp() {
+      const ul = document.getElementById('os-itens-temp');
+      ul.innerHTML = itensOSTemp.map((it, idx) =>
+        `<li class="flex justify-between bg-slate-50 px-2 py-1 rounded">
+          <span>${it.desc}</span>
+          <span>${formatarMoeda(it.valor)} <button onclick="itensOSTemp.splice(${idx},1);renderizarItensTemp()" class="text-red-500 ml-1">x</button></span>
+        </li>`
+      ).join('');
+    }
+
+    function salvarOS() {
+      const cliente = document.getElementById('os-cliente').value.trim();
+      const telefone = document.getElementById('os-telefone').value.trim();
+      const bairro = document.getElementById('os-bairro').value.trim();
+      const categoria = document.getElementById('os-categoria').value;
+      const descricao = document.getElementById('os-descricao').value.trim();
+      const deslocamento = parseFloat(document.getElementById('os-deslocamento').value) || 0;
+
+      if (!cliente) return alert('Informe o nome do cliente.');
+
+      const somaItens = itensOSTemp.reduce((acc, i) => acc + i.valor, 0);
+      const total = somaItens + deslocamento;
+
+      db.ordens.unshift({
+        id: Date.now(),
+        numero: 'OS-' + String(db.ordens.length + 1).padStart(3, '0'),
+        data: new Date().toLocaleDateString('pt-BR'),
+        cliente, telefone, bairro, categoria, descricao,
+        itens: [...itensOSTemp],
+        deslocamento, total,
+        status: 'Orçamento'
+      });
+
+      itensOSTemp = [];
+      renderizarItensTemp();
+      document.getElementById('os-cliente').value = '';
+      document.getElementById('os-telefone').value = '';
+      document.getElementById('os-bairro').value = '';
+      document.getElementById('os-descricao').value = '';
+      document.getElementById('os-deslocamento').value = '0';
+      salvarDB();
+    }
+
+    function concluirELancarOS(id) {
+      const os = db.ordens.find(o => o.id === id);
+      if (!os || os.status === 'Concluída') return;
+      os.status = 'Concluída';
+
+      const catFin = os.categoria === 'Serviço'
+        ? 'Serviço (Elétrica/Climatização)'
+        : 'Comércio (Venda de Materiais)';
+
+      db.financeiro.unshift({
+        id: Date.now(),
+        data: new Date().toLocaleDateString('pt-BR'),
+        tipo: 'Entrada',
+        categoria: catFin,
+        desc: `${os.numero} - ${os.cliente} (${os.descricao || 'Atendimento técnico'})`,
+        valor: os.total,
+        status: 'Pago'
+      });
+
+      salvarDB();
+      alert(`${os.numero} concluída e lançada no Financeiro (${catFin})!`);
+    }
+
+    function salvarCatalogo() {
+      const tipo = document.getElementById('cat-tipo').value;
+      const nome = document.getElementById('cat-nome').value.trim();
+      const preco = parseFloat(document.getElementById('cat-preco').value);
+      if (!nome || isNaN(preco)) return;
+      db.catalogo.push({ id: Date.now(), tipo, nome, preco });
+      document.getElementById('cat-nome').value = '';
+      document.getElementById('cat-preco').value = '';
+      salvarDB();
+    }
+
+    function salvarCliente() {
+      const nome = document.getElementById('cli-nome').value.trim();
+      const tel = document.getElementById('cli-tel').value.trim();
+      const bairro = document.getElementById('cli-bairro').value.trim();
+      if (!nome) return;
+      db.clientes.push({ id: Date.now(), nome, tel, bairro });
+      document.getElementById('cli-nome').value = '';
+      document.getElementById('cli-tel').value = '';
+      document.getElementById('cli-bairro').value = '';
+      salvarDB();
+    }
+
+    function exportarBackup() {
+      const blob = new Blob([JSON.stringify(db, null, 2)], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `backup-erp-mei-${new Date().toISOString().slice(0,10)}.json`;
+      a.click();
+    }
+
+    function importarBackup(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = e => {
+        try {
+          db = JSON.parse(e.target.result);
+          salvarDB();
+          alert('Backup restaurado com sucesso!');
+        } catch {
+          alert('Arquivo inválido.');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    function renderizarTudo() {
+      // Cálculos Dashboard
+      let entradasPagas = 0, saidasPagas = 0, pendenteReceber = 0;
+      let fatServico = 0, fatComercio = 0;
+      const despesasCat = {};
+
+      db.financeiro.forEach(f => {
+        if (f.tipo === 'Entrada') {
+          if (f.status === 'Pago') entradasPagas += f.valor;
+          else pendenteReceber += f.valor;
+
+          if (f.categoria.startsWith('Serviço')) fatServico += f.valor;
+          else fatComercio += f.valor;
+        } else {
+          if (f.status === 'Pago') saidasPagas += f.valor;
+          despesasCat[f.categoria] = (despesasCat[f.categoria] || 0) + f.valor;
+        }
+      });
+
+      const fatTotal = fatServico + fatComercio;
+      const percTeto = Math.min(100, (fatTotal / 81000) * 100);
+
+      document.getElementById('card-saldo').textContent = formatarMoeda(entradasPagas - saidasPagas);
+      document.getElementById('card-servicos').textContent = formatarMoeda(fatServico);
+      document.getElementById('card-comercio').textContent = formatarMoeda(fatComercio);
+      document.getElementById('card-receber').textContent = formatarMoeda(pendenteReceber);
+      document.getElementById('texto-teto').textContent = `${formatarMoeda(fatTotal)} / R$ 81.000,00 (${percTeto.toFixed(1)}%)`;
+
+      const barra = document.getElementById('barra-teto');
+      barra.style.width = percTeto + '%';
+      barra.className = `h-4 rounded-full transition-all duration-300 ${percTeto > 85 ? 'bg-red-500' : percTeto > 65 ? 'bg-amber-500' : 'bg-emerald-500'}`;
+
+      const divDesp = document.getElementById('resumo-despesas');
+      divDesp.innerHTML = Object.keys(despesasCat).length
+        ? Object.entries(despesasCat).map(([k, v]) => `<div class="bg-slate-50 p-3 rounded-lg border border-slate-200"><p class="text-xs text-slate-500">${k}</p><p class="font-bold text-slate-800">${formatarMoeda(v)}</p></div>`).join('')
+        : '<p class="text-slate-400 text-xs">Nenhuma despesa registrada ainda.</p>';
+
+      // Tabela Financeiro
+      document.getElementById('tabela-financeiro').innerHTML = db.financeiro.map(f => `
+        <tr>
+          <td class="py-2.5 text-slate-500">${f.data}</td>
+          <td class="py-2.5 font-semibold ${f.tipo === 'Entrada' ? 'text-emerald-600' : 'text-red-600'}">${f.tipo}</td>
+          <td class="py-2.5">${f.categoria}</td>
+          <td class="py-2.5">${f.desc}</td>
+          <td class="py-2.5 font-bold">${formatarMoeda(f.valor)}</td>
+          <td class="py-2.5">
+            <button onclick="alternarStatusFin(${f.id})" class="px-2 py-0.5 rounded text-xs font-medium ${f.status === 'Pago' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}">${f.status}</button>
+          </td>
+          <td class="py-2.5 text-right">
+            <button onclick="excluirFin(${f.id})" class="text-xs text-red-500 hover:underline">Excluir</button>
+          </td>
+        </tr>
+      `).join('');
+
+      // Lista OS
+      document.getElementById('lista-os').innerHTML = db.ordens.length ? db.ordens.map(o => `
+        <div class="border border-slate-200 rounded-xl p-4 flex flex-col sm:flex-row justify-between gap-3">
+          <div>
+            <div class="flex items-center gap-2">
+              <span class="font-bold text-slate-800">${o.numero}</span>
+              <span class="text-xs px-2 py-0.5 rounded-full font-medium ${o.status === 'Concluída' ? 'bg-emerald-100 text-emerald-700' : 'bg-blue-100 text-blue-700'}">${o.status}</span>
+              <span class="text-xs text-slate-400">${o.data} • ${o.categoria}</span>
+            </div>
+            <p class="font-semibold text-sm mt-1">${o.cliente} <span class="font-normal text-slate-500">${o.bairro ? '(' + o.bairro + ')' : ''}</span></p>
+            <p class="text-xs text-slate-600 mt-0.5">${o.descricao || 'Sem descrição adicional'}</p>
+            <p class="text-xs text-slate-500 mt-1">Itens: ${o.itens.map(i => `${i.desc} (${formatarMoeda(i.valor)})`).join(', ') || 'Nenhum'} | Deslocamento: ${formatarMoeda(o.deslocamento)}</p>
+          </div>
+          <div class="flex sm:flex-col justify-between items-end gap-2">
+            <p class="text-lg font-bold text-slate-900">${formatarMoeda(o.total)}</p>
+            <div class="flex gap-2">
+              ${o.status !== 'Concluída' ? `<button onclick="concluirELancarOS(${o.id})" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 py-1.5 rounded font-medium">Concluir & Lançar Caixa</button>` : ''}
+              <button onclick="window.print()" class="bg-slate-200 hover:bg-slate-300 text-slate-700 text-xs px-2.5 py-1.5 rounded">Imprimir/PDF</button>
+            </div>
+          </div>
+        </div>
+      `).join('') : '<p class="text-sm text-slate-400">Nenhum orçamento ou OS cadastrado ainda.</p>';
+
+      // Catálogo e Clientes
+      document.getElementById('lista-catalogo').innerHTML = db.catalogo.map(c =>
+        `<li class="py-2 flex justify-between"><span><strong class="text-xs text-slate-500">[${c.tipo}]</strong> ${c.nome}</span><span class="font-semibold">${formatarMoeda(c.preco)}</span></li>`
+      ).join('');
+      document.getElementById('lista-catalogo-dl').innerHTML = db.catalogo.map(c => `<option value="${c.nome}">`).join('');
+
+      document.getElementById('lista-clientes').innerHTML = db.clientes.map(c =>
+        `<li class="py-2 flex justify-between"><span><strong>${c.nome}</strong> (${c.bairro || '-'})</span><span class="text-slate-500">${c.tel || ''}</span></li>`
+      ).join('');
+      document.getElementById('lista-clientes-dl').innerHTML = db.clientes.map(c => `<option value="${c.nome}">`).join('');
+    }
+
+    atualizarCategoriasFin();
+    renderizarTudo();
+  </script>
+</body>
+</html>
